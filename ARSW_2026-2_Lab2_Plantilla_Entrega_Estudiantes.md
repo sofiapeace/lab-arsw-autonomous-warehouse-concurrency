@@ -350,9 +350,14 @@ Documente cada región crítica identificada.
 
 | Clase | Región crítica | Invariante protegida | Mecanismo usado | ¿Por qué ese tamaño? |
 |---|---|---|---|---|
-| | | | | |
-| | | | | |
-| | | | | |
+|PackageQueue |El bloque completo del método takeNext() |Ningún paquete se procesa más de una vez / No desaparecen paquetes |synchronized en el método |Se protege todo el bloque del método porque la verificación (isEmpty) y la extracción (remove) están acopladas lógicamente; si se dejaran separadas, se rompería la atomicidad permitiendo condiciones de carrera |
+|DeliveryRegistry |Las líneas en el método register() donde se lee y modifica nextPosition y se añade a deliveries |Las posiciones de entrega son únicas y forman una secuencia válida de 1..N |synchronized en el método |Se abarca todo el proceso de asignación y almacenamiento para garantizar que dos hilos no lean la misma nextPosition al mismo tiempo y colisionen |
+|WarehouseStatistics |Las operaciones de lectura, cálculo e incremento en el método recordProcessed() |El contador de procesados y el tiempo total reflejan fielmente las entregas reales |Bloque o método synchronized |Se protege el bloque crítico que realiza la operación "Read-Modify-Write" para evitar que múltiples hilos sobrescriban los contadores y se pierdan datos |
+
+**¿Qué pasaría con el rendimiento si la región protegida fuera innecesariamente grande?**
+Si la región crítica fuera innecesariamente grande (por ejemplo, si bloquearamos clases enteras o hiciéramos métodos extremadamente largos y pesados que incluyeran tareas fuera de la mutación de estado), el rendimiento y el throughput (rendimiento de procesamiento por unidad de tiempo) decaerían drásticamente.
+
+Esto ocurre porque transformaríamos un entorno altamente concurrente en una ejecución prácticamente secuencial: los hilos (robots) tendrían que hacer fila larguísima para entrar a ejecutar bloques de código que no lo necesitan, bloqueando los procesadores y aumentando la latencia de toda la simulación. La meta del diseño concurrente es que el bloqueo (synchronized) esté activo el menor tiempo posible, solo protegiendo los datos en memoria crítica
 
 ---
 
@@ -362,45 +367,46 @@ Documente cada región crítica identificada.
 
 Marque y explique cuáles evaluaron:
 
-- [ ] `synchronized`
+- [X] `synchronized`
 - [ ] `AtomicInteger`
 - [ ] Colecciones concurrentes
 - [ ] `Lock`
 - [ ] `wait()` / `notifyAll()`
-- [ ] Otra: `________________________`
+- [X] Otra: `Uso de variables atómicas`
 
 ### Alternativa 1
 
 **Descripción:**  
-`________________________________________________________________________`
+`Uso de un único bloqueo global (global lock) sincronizando todas las clases con un objeto único o haciendo todos los métodos públicos sincronizados por defecto`
 
 **Ventaja:**  
-`________________________________________________________________________`
+`Garantiza seguridad total contra condiciones de carrera de forma inmediata y sin análisis complejo de granularidad`
 
 **Desventaja:**  
-`________________________________________________________________________`
+`Destruye por completo el rendimiento y el throughput (rendimiento de procesamiento), ya que serializa la ejecución de los robots y elimina los beneficios de la concurrencia al obligarlos a hacer fila para cualquier operación`
 
 ### Alternativa 2
 
 **Descripción:**  
-`________________________________________________________________________`
+`Reemplazar los contadores de WarehouseStatistics por AtomicInteger/AtomicLong con incrementAndGet()/addAndGet(), evitando synchronized en esa clase`
 
 **Ventaja:**  
-`________________________________________________________________________`
+`Es lock-free: usa instrucciones de hardware (compare-and-swap) en vez de bloquear hilos, lo que puede reducir la contención bajo alta concurrencia comparado con synchronized`
 
 **Desventaja:**  
-`________________________________________________________________________`
+`No sirve para PackageQueue ni DeliveryRegistry, porque ahí la operación involucra varias variables relacionadas (lista + contador) que deben cambiar como una sola unidad — los tipos Atomic* solo garantizan atomicidad de una variable individual, no de una transacción sobre varias`
 
 ### Decisión final
 
 **Mecanismo seleccionado:**  
-`________________________________________`
+`Primitivas de monitor de Java (synchronized) aplicadas con la menor granularidad posible en los métodos críticos`
 
 **Justificación:**  
-`________________________________________________________________________`
+`Seleccionamos synchronized porque nos permite garantizar exclusión mutua de manera nativa, protegiendo estrictamente las regiones críticas donde ocurre la mutación del estado compartido (en PackageQueue, DeliveryRegistry y WarehouseStatistics). Al aplicar synchronized a nivel de método o bloque específico (y no de forma global), logramos preservar el paralelismo y la concurrencia de los robots, asegurando el cumplimiento de las invariantes con el menor costo posible en el rendimiento del sistema`
 
-`________________________________________________________________________`
 
+**¿Por qué Thread.sleep(...) no es un sustituto válido de join() cuando se espera a que un trabajador termine?**
+Thread.sleep(n) asume que se puede predecir cuánto tardará el trabajo concurrente, lo cual es falso en general: el tiempo de ejecución de los robots depende de la carga (número de parcels, jitter aleatorio, número de núcleos disponibles, scheduling del SO). Si n es muy corto, el reporte se imprime antes de que termine el trabajo (justo el bug del starter). Si n es muy largo, se desperdicia tiempo esperando innecesariamente. join(), en cambio, es una sincronización basada en un evento real (la terminación del hilo), no en una estimación de tiempo — es correcto sin importar cuánto tarde el trabajo, y no depende de suposiciones frágiles sobre el hardware o la carga
 ---
 
 # 8. Finalización de threads
