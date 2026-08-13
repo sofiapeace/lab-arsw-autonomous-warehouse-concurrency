@@ -139,22 +139,29 @@ Documente **mínimo tres** comportamientos incorrectos o potencialmente incorrec
 
 ## Race Condition #1
 
-**Clase / método involucrado:**  
-`________________________________________`
+**Clase / método involucrado: **  
+`PackageQueue / takeNext()`
 
 **Estado compartido involucrado:**  
-`________________________________________`
+`La lista interna pending (List<Parcel>)`
 
 **Comportamiento observado:**  
-`________________________________________`
+`Los robots arrojan una excepción IndexOutOfBoundsException al intentar extraer paquetes de la cola`
 
 **¿Por qué ocurre?**  
-`________________________________________`
+`Ocurre por el patrón check-then-act. Dos o más hilos verifican que la cola no está vacía (ej. if (!queue.isEmpty())) y luego ambos intentan retirar el elemento al mismo tiempo (ej. queue.remove(0)). El primer hilo retira el último elemento disponible y el segundo hilo, asumiendo que el elemento aún está ahí, intenta retirarlo y provoca un error de desbordamiento de índice`
 
 **Evidencia de ejecución:**
 
-```text
-PEGAR_AQUÍ_LA_EVIDENCIA
+```
+java -cp target/classes edu.eci.arsw.warehouse.verification.RaceConditionProbe
+
+[warehouse-robot-15] Queue anomaly: IndexOutOfBoundsException
+[warehouse-robot-6] Queue anomaly: IndexOutOfBoundsException
+[warehouse-robot-10] Queue anomaly: IndexOutOfBoundsException
+[warehouse-robot-22] Queue anomaly: IndexOutOfBoundsException
+Run 06 -> RACE/ANOMALY | pending=0, processedCounter=392, registry=498, uniqueParcels=386, uniquePositions=376, positionsContiguous=false
+
 ```
 
 ---
@@ -162,16 +169,16 @@ PEGAR_AQUÍ_LA_EVIDENCIA
 ## Race Condition #2
 
 **Clase / método involucrado:**  
-`________________________________________`
+`WarehouseStatistics / recordProcessed()`
 
 **Estado compartido involucrado:**  
-`________________________________________`
+`Las variables processedParcels (int) y totalProcessingMillis (long)`
 
 **Comportamiento observado:**  
-`________________________________________`
+`El número de paquetes procesados es menor al total de paquetes, y la cantidad de elementos en el registro no coincide con el contador de procesados ni con el total`
 
 **¿Por qué ocurre?**  
-`________________________________________`
+`Se debe al patrón "Read-Modify-Write". Cuando dos hilos intentan actualizar un contador no atómico al mismo tiempo (ej. contador++), leen el mismo valor base (ej. 10), ambos lo incrementan a 11 y lo guardan. En lugar de ser 12, el contador queda en 11, "perdiendo" un paquete en la estadística`
 
 **Evidencia de ejecución:**
 
@@ -184,16 +191,16 @@ PEGAR_AQUÍ_LA_EVIDENCIA
 ## Race Condition #3
 
 **Clase / método involucrado:**  
-`________________________________________`
+`DeliveryRegistry / register()`
 
 **Estado compartido involucrado:**  
-`________________________________________`
+`La variable nextPosition (int) y la lista deliveries (List<DeliveryRecord>)`
 
 **Comportamiento observado:**  
-`________________________________________`
+`La bandera positionsContiguous es false, lo que significa que el orden de entrega está corrupto. Además, uniquePositions es menor que registry size, indicando que hay posiciones repetidas`
 
 **¿Por qué ocurre?**  
-`________________________________________`
+`Dos robots leen al mismo tiempo que la siguiente posición disponible es la "15". Ambos registran su paquete en la posición "15" y luego actualizan el contador a "16". Resultan dos paquetes en la misma posición, violando la regla de secuencia  `
 
 **Evidencia de ejecución:**
 
