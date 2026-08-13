@@ -1,0 +1,15 @@
+/Users/joselancheros/Desktop/lab-arsw-autonomous-warehouse-concurrency/src/main/java/edu/eci/arsw/warehouse/app/PauseResumeDemo.java
+/Users/joselancheros/Desktop/lab-arsw-autonomous-warehouse-concurrency/src/main/java/edu/eci/arsw/warehouse/app/WarehouseFactory.java
+/Users/joselancheros/Desktop/lab-arsw-autonomous-warehouse-concurrency/src/main/java/edu/eci/arsw/warehouse/app/WarehouseMain.java
+/Users/joselancheros/Desktop/lab-arsw-autonomous-warehouse-concurrency/src/main/java/edu/eci/arsw/warehouse/app/WarehouseSimulation.java
+/Users/joselancheros/Desktop/lab-arsw-autonomous-warehouse-concurrency/src/main/java/edu/eci/arsw/warehouse/core/DeliveryRegistry.java
+/Users/joselancheros/Desktop/lab-arsw-autonomous-warehouse-concurrency/src/main/java/edu/eci/arsw/warehouse/core/PackageQueue.java
+/Users/joselancheros/Desktop/lab-arsw-autonomous-warehouse-concurrency/src/main/java/edu/eci/arsw/warehouse/core/SimulationControl.java
+/Users/joselancheros/Desktop/lab-arsw-autonomous-warehouse-concurrency/src/main/java/edu/eci/arsw/warehouse/core/WarehouseStatistics.java
+/Users/joselancheros/Desktop/lab-arsw-autonomous-warehouse-concurrency/src/main/java/edu/eci/arsw/warehouse/model/DeliveryRecord.java
+/Users/joselancheros/Desktop/lab-arsw-autonomous-warehouse-concurrency/src/main/java/edu/eci/arsw/warehouse/model/Parcel.java
+/Users/joselancheros/Desktop/lab-arsw-autonomous-warehouse-concurrency/src/main/java/edu/eci/arsw/warehouse/model/WarehouseSnapshot.java
+/Users/joselancheros/Desktop/lab-arsw-autonomous-warehouse-concurrency/src/main/java/edu/eci/arsw/warehouse/verification/InvariantChecker.java
+/Users/joselancheros/Desktop/lab-arsw-autonomous-warehouse-concurrency/src/main/java/edu/eci/arsw/warehouse/verification/InvariantReport.java
+/Users/joselancheros/Desktop/lab-arsw-autonomous-warehouse-concurrency/src/main/java/edu/eci/arsw/warehouse/verification/RaceConditionProbe.java
+/Users/joselancheros/Desktop/lab-arsw-autonomous-warehouse-concurrency/src/main/java/edu/eci/arsw/warehouse/worker/WarehouseRobot.java

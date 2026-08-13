@@ -1,0 +1,15 @@
+edu/eci/arsw/warehouse/verification/InvariantChecker.class
+edu/eci/arsw/warehouse/model/DeliveryRecord.class
+edu/eci/arsw/warehouse/app/WarehouseMain.class
+edu/eci/arsw/warehouse/core/PackageQueue.class
+edu/eci/arsw/warehouse/app/PauseResumeDemo.class
+edu/eci/arsw/warehouse/core/WarehouseStatistics.class
+edu/eci/arsw/warehouse/app/WarehouseSimulation.class
+edu/eci/arsw/warehouse/core/SimulationControl.class
+edu/eci/arsw/warehouse/model/WarehouseSnapshot.class
+edu/eci/arsw/warehouse/model/Parcel.class
+edu/eci/arsw/warehouse/verification/RaceConditionProbe.class
+edu/eci/arsw/warehouse/core/DeliveryRegistry.class
+edu/eci/arsw/warehouse/app/WarehouseFactory.class
+edu/eci/arsw/warehouse/worker/WarehouseRobot.class
+edu/eci/arsw/warehouse/verification/InvariantReport.class

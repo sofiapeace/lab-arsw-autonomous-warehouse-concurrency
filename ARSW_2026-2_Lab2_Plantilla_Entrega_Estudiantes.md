@@ -11,14 +11,13 @@
 
 ## 0. Información del equipo
 
-| Integrante | Código / ID | GitHub |
-|---|---|---|
-| | | |
-| | | |
-| | | |
+| Integrante                | Código / ID | GitHub     |
+|---------------------------|-------------|------------|
+| Jose Luis Lancheros Ayora | 100102647   | Lanch3ros  |
+| Gina Sofia Garcia Zapata  | 1000100098  | sofiapeace |
 
 **Repositorio:**  
-`PEGAR_AQUÍ_URL_DEL_REPOSITORIO`
+https://github.com/sofiapeace/lab-arsw-autonomous-warehouse-concurrency
 
 **Commit final:**  
 `PEGAR_AQUÍ_HASH_DEL_COMMIT`
@@ -39,8 +38,23 @@ mvn -version
 **Evidencia:**
 
 ```text
-PEGAR_AQUÍ_LA_SALIDA
+❯ java -version
+openjdk version "21.0.11" 2026-04-21
+OpenJDK Runtime Environment Homebrew (build 21.0.11)
+OpenJDK 64-Bit Server VM Homebrew (build 21.0.11, mixed mode, sharing)
+❯ mvn -version
+Apache Maven 3.9.16 (2bdd9fddda4b155ebf8000e807eb73fd829a51d5)
+Maven home: /opt/homebrew/Cellar/maven/3.9.16/libexec
+Java version: 26.0.1, vendor: Homebrew, runtime: /opt/homebrew/Cellar/openjdk/26.0.1/libexec/openjdk.jdk/Contents/Home
+Default locale: en_CO, platform encoding: UTF-8
+OS name: "mac os x", version: "26.5.2", arch: "aarch64", family: "mac"
 ```
+
+**Nota:** `java` en el PATH es JDK 21.0.11, mientras que Maven se ejecuta sobre
+JDK 26.0.1. Esto no afecta el laboratorio: `pom.xml` define
+`<maven.compiler.release>21</maven.compiler.release>`, por lo que el bytecode
+generado es Java 21. La salida de `mvn clean test` lo confirma:
+`Compiling 15 source files with javac [debug release 21]`.
 
 ---
 
@@ -60,14 +74,48 @@ java -cp target/classes edu.eci.arsw.warehouse.app.WarehouseMain <robots> <packa
 
 **Configuración utilizada:**
 
-- Robots:
-- Paquetes:
+- Robots: 12 (valor por defecto)
+- Paquetes: 100 (valor por defecto)
 
 **Resultado observado:**
 
 ```text
-PEGAR_AQUÍ_LA_SALIDA_RELEVANTE
+❯ java -cp target/classes edu.eci.arsw.warehouse.app.WarehouseMain
+Starting warehouse with 12 robots and 100 parcels...
+
+--- STARTER REPORT (intentionally premature) ---
+Initial parcels : 100
+Pending parcels : 66
+Processed count : 22
+Registry size   : 22
+Current leader  : Robot-08 / parcel 8 / position 1
+----------------------------------------------
+
+[warehouse-robot-12] Queue anomaly: IndexOutOfBoundsException
 ```
+
+**Observaciones:** el reporte se imprime con 66 paquetes aún pendientes,
+porque `WarehouseMain` usa `Thread.sleep(60)` en vez de `join()`. 
+`Processed count` (22) coincide aquí con `Registry size` (22), pero son dos
+contadores independientes y no siempre coinciden. Están alojados en objetos
+distintos y se actualizan mediante dos llamadas separadas del robot
+(`deliveryRegistry.register(...)` y `statistics.recordProcessed(...)`), por lo que
+un robot puede ser fotografiado entre ambas. En la ejecución con 24 robots y 250
+paquetes la diferencia sí es visible: `Processed count : 38` frente a
+`Registry size : 43`.
+
+**La suma no cuadra, y en este punto es esperado.** 66 pendientes + 22 registrados
+= 88, no 100. Los 12 restantes están *en vuelo*: cada uno de los 12 robots sostiene
+un paquete que ya retiró de la cola pero que todavía no registra. Un snapshot
+tomado a mitad de ejecución nunca cuadra, por lo que **este dato no constituye
+evidencia de una condición de carrera**. La evidencia válida solo se obtiene
+después de la terminación de todos los hilos.
+
+**Defecto real visible.** La línea
+`[warehouse-robot-12] Queue anomaly: IndexOutOfBoundsException` sí es evidencia
+directa de acceso concurrente no sincronizado: `PackageQueue.takeNext()` evaluó
+`isEmpty()` como falso y aun así `get(0)`/`remove(0)` falló, porque otro robot
+modificó la lista entre ambas operaciones.
 
 ---
 
