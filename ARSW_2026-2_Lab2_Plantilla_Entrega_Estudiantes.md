@@ -414,19 +414,18 @@ Thread.sleep(n) asume que se puede predecir cuánto tardará el trabajo concurre
 Explique cómo garantizaron que el programa solamente genera el reporte final cuando todos los robots han terminado.
 
 **Mecanismo utilizado:**  
-`________________________________________`
+`Thread.join(), invocado sobre cada WarehouseRobot desde WarehouseSimulation.awaitCompletion(), llamado explícitamente antes de imprimir el reporte final`
 
 **Explicación:**  
-`________________________________________________________________________`
+`Como se evidenció en la sección 1.2, el starter imprime el reporte con 68 de 100 paquetes aún pendientes porque WarehouseMain.main() no espera a que terminen los robots antes de reportar. La corrección consiste en invocar simulation.awaitCompletion() —que recorre la lista de robots y llama robot.join() sobre cada uno— antes de tomar el snapshot() y de imprimir el reporte. join() bloquea al hilo llamador hasta que el robot correspondiente termine completamente su run(), garantizando que las 12 (o N) tareas hayan finalizado antes de leer cualquier estado compartido, y que el reporte se imprima exactamente una vez, ya en el estado final consistente del sistema`
 
-`________________________________________________________________________`
 
 ### Pregunta
 
 ¿Por qué usar `Thread.sleep(...)` no sería una solución correcta para esperar la finalización de todos los workers?
 
 **Respuesta:**  
-`________________________________________________________________________`
+`Porque sleep(n) pausa el hilo actual un tiempo fijo, sin ninguna relación con el estado real de otros hilos — asume que se puede predecir cuánto tardará el trabajo concurrente, lo cual es falso en general (depende del número de parcels, del jitter aleatorio en el procesamiento, del número de robots activos y del scheduling del sistema operativo). Si el tiempo estimado es corto, el reporte se imprime antes de que termine el trabajo —exactamente el bug observado en la sección 1.2, donde a los 100 parcels solo 19 se habían procesado—; si es demasiado largo, se desperdicia tiempo esperando innecesariamente. join(), en cambio, sincroniza sobre un evento real —la terminación efectiva del hilo— y es correcto sin importar cuánto tarde el trabajo en la práctica`
 
 ---
 
