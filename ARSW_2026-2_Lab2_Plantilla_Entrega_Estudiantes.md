@@ -264,16 +264,35 @@ copiada mientras otro robot la estaba modificando y contenía una posición vac�
 Seleccione una de las condiciones de carrera anteriores y represente un interleaving posible.
 
 **Condición seleccionada:**  
-`________________________________________`
+`Race Condition #1 — PackageQueue.takeNext()`
+
+Para que la traza sea legible se supone una cola con solo tres paquetes,
+`pending = [P1, P2, P3]`, y dos robots, A y B. El código analizado es:
+
+```java
+public Parcel takeNext() {
+    if (pending.isEmpty()) {          // paso 1
+        return null;
+    }
+    Parcel selected = pending.get(0); // paso 2
+    Thread.yield();
+    pending.remove(0);                // paso 3
+    return selected;
+}
+```
 
 | Paso | Thread A | Thread B | Estado compartido |
 |---:|---|---|---|
-| 1 | | | |
-| 2 | | | |
-| 3 | | | |
-| 4 | | | |
-| 5 | | | |
-| 6 | | | |
+| 1 | `pending.isEmpty()` devuelve false | — | `pending = [P1, P2, P3]` |
+| 2 | `selected = pending.get(0)` devuelve **P1** | — | `pending = [P1, P2, P3]`, A carga P1 pero todavía no lo saca |
+| 3 | Se detiene en `Thread.yield()` | `pending.isEmpty()` devuelve false | `pending = [P1, P2, P3]`, P1 sigue en la lista |
+| 4 | — | `selected = pending.get(0)` devuelve **P1** | `pending = [P1, P2, P3]`, A y B cargan el mismo paquete |
+| 5 | `pending.remove(0)` elimina P1 | — | `pending = [P2, P3]` |
+| 6 | — | `pending.remove(0)` elimina **P2** | `pending = [P3]`, P2 desaparece sin que nadie lo procese |
+
+**Resultado:** P1 se entrega dos veces una por A y otra por B y P2 se elimina de la
+cola sin haber sido procesado nunca. Se retiraron dos elementos y se procesaron dos
+paquetes, así que la cantidad cuadra, pero el contenido es incorrecto.
 
 ### Explicación
 
@@ -281,9 +300,9 @@ Seleccione una de las condiciones de carrera anteriores y represente un interlea
 
 **Respuesta:**
 
-`________________________________________________________________________`
+`takeNext() no es atómico: consultar isEmpty(), leer get(0) y ejecutar remove(0) son tres operaciones separadas y cualquier otro robot puede entrar en medio. En el paso 2 el robot A ya decidió que se lleva P1, pero para la lista P1 sigue disponible porque todavía no lo ha retirado. Esa ventana entre "elegí el paquete" y "lo saqué de la lista" es la región crítica: mientras dura, la lista miente sobre lo que realmente está disponible, y B toma la misma decisión sobre el mismo paquete.`
 
-`________________________________________________________________________`
+`El daño se duplica en el paso 6 porque remove(0) elimina por posición y no por identidad: B no borra el paquete que carga, sino el que esté de primero en ese momento, que ya es P2. Por eso una sola condición de carrera produce a la vez dos síntomas: paquetes entregados más de una vez y paquetes que desaparecen sin registro. Como se retira exactamente un elemento por cada llamada, pending igual llega a 0 y la simulación parece terminar bien: el error no se ve en el conteo de pendientes, solo en el contenido del registro. Eso explica la evidencia de la sección 3, donde pending=0 pero hay 508 registros con apenas 443 IDs distintos sobre 500 paquetes. El Thread.yield() del código no causa el problema, solo ensancha la ventana para que ocurra en cada ejecución en lugar de ocasionalmente.`
 
 ---
 
