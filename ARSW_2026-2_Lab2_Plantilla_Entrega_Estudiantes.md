@@ -436,9 +436,7 @@ Explique cómo garantizaron que el programa solamente genera el reporte final cu
 Explique por qué el busy waiting de la implementación inicial no es adecuado.
 
 **Respuesta:**  
-`________________________________________________________________________`
-
-`________________________________________________________________________`
+`La implementación inicial usa while (paused) { Thread.onSpinWait(); } en awaitIfPaused(), lo que obliga a cada robot pausado a comprobar la bandera repetidamente en un bucle ajustado, consumiendo ciclos de CPU de forma continua sin realizar trabajo útil. Con varios robots pausados simultáneamente (los 12 del ejemplo), esto desperdicia recursos de procesamiento que podrían usarse para otras tareas del sistema, y no escala: cuantos más robots, más núcleos quedan ocupados solo "preguntando" si ya pueden continuar, en lugar de estar realmente inactivos hasta que exista un evento real que los despierte `
 
 ---
 
@@ -452,9 +450,11 @@ Explique cómo implementaron:
 - despertar coordinado de los workers
 
 **Respuesta:**  
-`________________________________________________________________________`
+`Se convirtió SimulationControl en un monitor: pause(), resume(), awaitIfPaused() e isPaused() son todos métodos synchronized sobre la misma instancia.
 
-`________________________________________________________________________`
+pause() cambia paused = true dentro de la sección sincronizada.
+Los robots, en vez de hacer spin, llaman awaitIfPaused(), que evalúa while (paused) { wait(); }: si está pausado, el hilo llama wait(), lo cual libera el lock de SimulationControl y suspende al hilo sin consumir CPU, hasta ser notificado.
+resume() cambia paused = false y llama notifyAll(), que despierta a todos los hilos que estaban en wait() sobre ese objeto (se usó notifyAll() y no notify() porque este último solo despertaría a un robot arbitrario, dejando al resto de los 12 bloqueados indefinidamente)`
 
 ---
 
@@ -462,19 +462,28 @@ Explique cómo implementaron:
 
 Cuando la simulación está pausada, registre:
 
-```text
-Processed parcels:
-Pending parcels:
-Registry size:
-Current leader:
+```java -cp target/classes edu.eci.arsw.warehouse.app.PauseResumeDemo
+
+--- PAUSED SNAPSHOT ---
+Initial parcels : 180
+Pending parcels : 66
+Processed count : 106
+Registry size   : 118
+Current leader  : Robot-08 / parcel 8 / position 1
+Simulation paused = true
+
+--- FINAL SNAPSHOT ---
+Initial parcels : 180
+Pending parcels : 2
+Processed count : 155
+Registry size   : 171
+Current leader  : Robot-08 / parcel 8 / position 1
 ```
 
 Explique cómo garantizan que esos valores representan un estado consistente.
 
 **Respuesta:**  
-`________________________________________________________________________`
-
-`________________________________________________________________________`
+`Estos valores representan un estado consistente porque el mecanismo de pausa actúa como una barrera de sincronización segura (safe point). Al utilizar 'wait()', nos aseguramos de que todos los hilos trabajadores (robots) suspendan su ejecución en el mismo punto de control de su ciclo principal (antes o después de procesar un paquete completo). Dado que ningún robot está en estado de 'RUNNABLE' interactuando con PackageQueue, DeliveryRegistry o WarehouseStatistics durante la pausa, el estado global de la memoria queda completamente "congelado". Al no haber mutaciones concurrentes en progreso, el snapshot refleja una foto exacta y matemáticamente precisa del sistema en ese instante de tiempo, sin lecturas parciales`
 
 ---
 
