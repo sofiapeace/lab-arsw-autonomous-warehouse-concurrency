@@ -310,21 +310,37 @@ paquetes, así que la cantidad cuadra, pero el contenido es incorrecto.
 
 Defina las invariantes que su solución debe preservar.
 
+## Evaluación de las invariantes candidatas
+
+El enunciado propone seis candidatas. Antes de fijar el conjunto definitivo se
+clasificó cada una en esta tabla:
+
+| # | Candidata | Clasificación | Razón |
+|---:|---|---|---|
+| 1 | Cada paquete se procesa a lo sumo una vez | **Incompleta** | "A lo sumo una vez" también se cumple si el paquete no se procesa nunca. Hay que unirla con la candidata 2 para obtener "exactamente una vez" |
+| 2 | Ningún paquete desaparece del sistema | **Requerida** | Es la mitad que le falta a la candidata 1 |
+| 3 | Las posiciones de llegada son únicas | **Derivada** | Se deduce de la candidata 4: si N registros ocupan exactamente las posiciones 1..N, entonces son N valores distintos y no puede haber repetidos |
+| 4 | Las posiciones forman una secuencia válida 1..N | **Requerida** | Es más fuerte que la 3 y es la que realmente hay que verificar |
+| 5 | El contador de procesados coincide con el número de registros | **Requerida, pero hay que acotarla** | Solo tiene sentido cuando ningún robot está a mitad de una iteración. Entre `register()` y `recordProcessed()` la igualdad no se cumple ni siquiera en un programa correcto |
+| 6 | Al reportar la simulación como terminada no quedan paquetes pendientes | **Incompleta** | `pending=0` se cumplió en el 100% de las corridas defectuosas de la sección 3. Por sí sola no prueba nada: hay que exigir además que el registro tenga tantas entradas como paquetes iniciales y que todos los hilos hayan terminado |
+
+Ninguna candidata resultó innecesaria.
+
 ## I1
 
-`________________________________________________________________________`
+`Cada paquete se procesa exactamente una vez: el registro no contiene IDs de paquete repetidos y ningún paquete queda sin registrar. Une las candidatas 1 y 2, porque por separado ninguna alcanza. Se verifica con uniqueParcels == registry.size() == initialParcels. Es la invariante que viola la condición de carrera #1 (takeNext), donde P1 se entregó dos veces y P2 desapareció.`
 
 ## I2
 
-`________________________________________________________________________`
+`Las posiciones de llegada forman la secuencia 1..N sin huecos ni repeticiones, siendo N el número de registros. Se verifica con positionsContiguous == true, que además implica uniquePositions == registry.size(). Es la invariante que viola la condición de carrera #3 (register), donde 64 entregas recibieron una posición ya ocupada.`
 
 ## I3
 
-`________________________________________________________________________`
+`Cuando ningún robot está a mitad de una iteración, processedParcels == deliveries.size(). El alcance es parte de la invariante: se exige al terminar todos los hilos o con todos los robots detenidos en el punto seguro, nunca en cualquier instante arbitrario. Es la invariante que viola la condición de carrera #2 (recordProcessed), con 34 incrementos destruidos.`
 
 ## I4 — opcional
 
-`________________________________________________________________________`
+`Cuando el programa reporta que la simulación terminó deben cumplirse las tres condiciones a la vez: pendingParcels == 0, deliveries.size() == initialParcels y todos los hilos robot efectivamente terminados. Las tres juntas, porque pending == 0 se cumplía incluso en las corridas corruptas y porque exigir la terminación real de los hilos es lo que descarta tanto el reporte prematuro de WarehouseMain como el caso en que la simulación nunca termina.`
 
 ---
 
