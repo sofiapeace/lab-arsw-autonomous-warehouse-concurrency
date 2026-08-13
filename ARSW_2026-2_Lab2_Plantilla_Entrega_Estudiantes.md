@@ -139,30 +139,46 @@ Documente **mínimo tres** comportamientos incorrectos o potencialmente incorrec
 
 ## Race Condition #1
 
-**Clase / método involucrado: **  
+**Clase / método involucrado:**  
 `PackageQueue / takeNext()`
 
 **Estado compartido involucrado:**  
 `La lista interna pending (List<Parcel>)`
 
 **Comportamiento observado:**  
-`Los robots arrojan una excepción IndexOutOfBoundsException al intentar extraer paquetes de la cola`
+`Se observan tres consecuencias distintas. (1) Dos robots cargan el mismo paquete: el registro termina con más entradas que paquetes existentes y con IDs repetidos. (2) Los robots arrojan IndexOutOfBoundsException al intentar extraer paquetes de la cola. (3) En el caso más grave la simulación nunca termina: los robots quedan girando indefinidamente y el proceso consume un núcleo al 100%`
 
 **¿Por qué ocurre?**  
-`Ocurre por el patrón check-then-act. Dos o más hilos verifican que la cola no está vacía (ej. if (!queue.isEmpty())) y luego ambos intentan retirar el elemento al mismo tiempo (ej. queue.remove(0)). El primer hilo retira el último elemento disponible y el segundo hilo, asumiendo que el elemento aún está ahí, intenta retirarlo y provoca un error de desbordamiento de índice`
+`Ocurre por el patrón check-then-act. takeNext() hace tres cosas por separado y sin ninguna protección: pregunta pending.isEmpty(), luego lee pending.get(0) y solo después ejecuta pending.remove(0). Como nada impide que otro robot entre en medio, se dan dos casos. Caso frecuente: dos robots alcanzan a leer get(0) antes de que alguno haga remove(0), así que ambos se llevan el mismo paquete; ese paquete se entrega dos veces y otro queda sin procesar. Caso del último elemento: un robot verifica que la lista no está vacía, otro retira el único que quedaba, y cuando el primero intenta retirarlo ya no existe, lo que produce IndexOutOfBoundsException. Además ArrayList no está preparado para varios hilos: dos remove(0) simultáneos pueden dejar su contador interno de tamaño en negativo. Desde ese momento la lista responde que no está vacía pero no entrega ningún elemento, y como un robot solo termina cuando takeNext() devuelve null, los robots giran para siempre y el programa no termina`
 
 **Evidencia de ejecución:**
 
 ```
-java -cp target/classes edu.eci.arsw.warehouse.verification.RaceConditionProbe
+$ java -cp target/classes edu.eci.arsw.warehouse.verification.RaceConditionProbe 50 32 500
+Run 01 -> RACE/ANOMALY | pending=0, processedCounter=461, registry=503, uniqueParcels=418, uniquePositions=431, positionsContiguous=false
+Run 02 -> RACE/ANOMALY | pending=0, processedCounter=474, registry=508, uniqueParcels=443, uniquePositions=444, positionsContiguous=false
+[warehouse-robot-21] Queue anomaly: IndexOutOfBoundsException
+[warehouse-robot-7] Queue anomaly: IndexOutOfBoundsException
+[warehouse-robot-24] Queue anomaly: IndexOutOfBoundsException
 
-[warehouse-robot-15] Queue anomaly: IndexOutOfBoundsException
-[warehouse-robot-6] Queue anomaly: IndexOutOfBoundsException
-[warehouse-robot-10] Queue anomaly: IndexOutOfBoundsException
-[warehouse-robot-22] Queue anomaly: IndexOutOfBoundsException
-Run 06 -> RACE/ANOMALY | pending=0, processedCounter=392, registry=498, uniqueParcels=386, uniquePositions=376, positionsContiguous=false
+Anomalous runs: 50/50
 
+$ java -cp target/classes edu.eci.arsw.warehouse.app.WarehouseMain
+[warehouse-robot-12] Queue anomaly: IndexOutOfBoundsException
+
+$ java -cp target/classes edu.eci.arsw.warehouse.verification.RaceConditionProbe 30 8 100
+Run 20 -> RACE/ANOMALY | pending=0, processedCounter=100, registry=99, uniqueParcels=97, uniquePositions=96, positionsContiguous=false
+(la corrida 21 nunca terminó)
 ```
+
+**Lectura de la evidencia:** con 500 paquetes iniciales el registro quedó con 508
+entradas y solo 443 IDs distintos, es decir 65 paquetes se entregaron más de una vez
+y 57 no quedaron registrados nunca. La medición es válida porque se tomó después de
+que todos los hilos terminaron: el probe llama `awaitCompletion()` antes de
+verificar. La corrida con 8 robots y 100 paquetes no llegó a terminar: se quedó
+detenida en la corrida 21 consumiendo un núcleo al 100% y escribiendo 22 millones de
+líneas de `IndexOutOfBoundsException` (1.5 GB de log) en tres minutos, y hubo que
+abortarla manualmente.
 
 ---
 
@@ -178,13 +194,25 @@ Run 06 -> RACE/ANOMALY | pending=0, processedCounter=392, registry=498, uniquePa
 `El número de paquetes procesados es menor al total de paquetes, y la cantidad de elementos en el registro no coincide con el contador de procesados ni con el total`
 
 **¿Por qué ocurre?**  
-`Se debe al patrón "Read-Modify-Write". Cuando dos hilos intentan actualizar un contador no atómico al mismo tiempo (ej. contador++), leen el mismo valor base (ej. 10), ambos lo incrementan a 11 y lo guardan. En lugar de ser 12, el contador queda en 11, "perdiendo" un paquete en la estadística`
+`Se debe al patrón "Read-Modify-Write". Cuando dos hilos intentan actualizar un contador no atómico al mismo tiempo (ej. contador++), leen el mismo valor base (ej. 10), ambos lo incrementan a 11 y lo guardan. En lugar de ser 12, el contador queda en 11, "perdiendo" un paquete en la estadística. Lo mismo ocurre con totalProcessingMillis, que se actualiza igual. Este error no produce ninguna excepción ni mensaje: el número simplemente queda por debajo del trabajo realmente hecho`
 
 **Evidencia de ejecución:**
 
 ```text
-PEGAR_AQUÍ_LA_EVIDENCIA
+$ java -cp target/classes edu.eci.arsw.warehouse.verification.RaceConditionProbe 50 32 500
+Run 02 -> RACE/ANOMALY | pending=0, processedCounter=474, registry=508, uniqueParcels=443, uniquePositions=444, positionsContiguous=false
+Run 13 -> RACE/ANOMALY | pending=0, processedCounter=488, registry=499, uniqueParcels=489, uniquePositions=472, positionsContiguous=false
+
+$ java -cp target/classes edu.eci.arsw.warehouse.verification.RaceConditionProbe 30 16 250
+Run 30 -> RACE/ANOMALY | pending=0, processedCounter=241, registry=251, uniqueParcels=242, uniquePositions=223, positionsContiguous=false
 ```
+
+**Lectura de la evidencia:** en las tres corridas el contador quedó por debajo del
+número de registros, aunque ambos se incrementan una sola vez por paquete, dentro de
+la misma iteración y por el mismo robot. En la corrida 02 la diferencia es de 34
+incrementos destruidos. Como el probe llama `awaitCompletion()` antes de
+verificar, ningún robot estaba a mitad de trabajo: la diferencia no puede explicarse
+por paquetes en vuelo.
 
 ---
 
@@ -197,16 +225,37 @@ PEGAR_AQUÍ_LA_EVIDENCIA
 `La variable nextPosition (int) y la lista deliveries (List<DeliveryRecord>)`
 
 **Comportamiento observado:**  
-`La bandera positionsContiguous es false, lo que significa que el orden de entrega está corrupto. Además, uniquePositions es menor que registry size, indicando que hay posiciones repetidas`
+`La bandera positionsContiguous es false, lo que significa que el orden de entrega está corrupto. Además, uniquePositions es menor que registry size, indicando que hay posiciones repetidas. También se pierden registros: con 500 paquetes solo quedaron 443 IDs distintos. En algunas corridas el programa ni siquiera llega al final y aborta con NullPointerException`
 
 **¿Por qué ocurre?**  
-`Dos robots leen al mismo tiempo que la siguiente posición disponible es la "15". Ambos registran su paquete en la posición "15" y luego actualizan el contador a "16". Resultan dos paquetes en la misma posición, violando la regla de secuencia  `
+`Son tres problemas dentro del mismo método. (1) Posiciones repetidas: dos robots leen al mismo tiempo que la siguiente posición disponible es la "15". Ambos registran su paquete en la posición "15" y luego actualizan el contador a "16". Resultan dos paquetes en la misma posición, violando la regla de secuencia, y además la numeración 1..N queda con huecos. (2) Registros perdidos: deliveries es un ArrayList que varios robots modifican al mismo tiempo, de modo que algunos add() se pisan entre sí y esos registros desaparecen sin dejar rastro ni error. (3) Copia inconsistente: snapshot() ejecuta List.copyOf sobre la lista mientras los robots la siguen modificando; si alcanza a leer una posición todavía vacía, falla con NullPointerException y aborta el programa`
 
 **Evidencia de ejecución:**
 
 ```text
-PEGAR_AQUÍ_LA_EVIDENCIA
+$ java -cp target/classes edu.eci.arsw.warehouse.verification.RaceConditionProbe 50 32 500
+Run 02 -> RACE/ANOMALY | pending=0, processedCounter=474, registry=508, uniqueParcels=443, uniquePositions=444, positionsContiguous=false
+Run 27 -> RACE/ANOMALY | pending=0, processedCounter=458, registry=501, uniqueParcels=472, uniquePositions=442, positionsContiguous=false
+
+$ java -cp target/classes edu.eci.arsw.warehouse.verification.RaceConditionProbe
+Run 10 -> RACE/ANOMALY | pending=0, processedCounter=239, registry=247, uniqueParcels=236, uniquePositions=225, positionsContiguous=false
+Exception in thread "main" java.lang.NullPointerException
+        at java.base/java.util.Objects.requireNonNull(Objects.java:233)
+        at java.base/java.util.ImmutableCollections.listFromArray(ImmutableCollections.java:192)
+        at java.base/java.util.List.of(List.java:1172)
+        at java.base/java.util.ImmutableCollections.listCopy(ImmutableCollections.java:174)
+        at java.base/java.util.List.copyOf(List.java:1193)
+        at edu.eci.arsw.warehouse.core.DeliveryRegistry.snapshot(DeliveryRegistry.java:25)
+        at edu.eci.arsw.warehouse.app.WarehouseSimulation.snapshot(WarehouseSimulation.java:68)
+        at edu.eci.arsw.warehouse.verification.RaceConditionProbe.main(RaceConditionProbe.java:22)
 ```
+
+**Lectura de la evidencia:** en la corrida 02 hay 508 registros pero solo 444
+posiciones distintas, es decir 64 entregas recibieron una posición que ya estaba
+ocupada, y `positionsContiguous=false` confirma que la numeración 1..N tiene huecos.
+La traza de `NullPointerException` señala exactamente `DeliveryRegistry.java:25`, la
+línea del `List.copyOf`, y abortó el probe en la corrida 11 de 30: la lista fue
+copiada mientras otro robot la estaba modificando y contenía una posición vacía.
 
 ---
 
