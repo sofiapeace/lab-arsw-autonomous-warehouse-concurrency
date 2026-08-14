@@ -533,7 +533,7 @@ Considere:
 
 **Conclusión:**
 
-`Para demostrar de forma rigurosa y empírica que la solución implementada es correcta, nos basamos en los resultados de la sonda de verificación (RaceConditionProbe) y el diseño arquitectónico de concurrencia:
+Para demostrar de forma rigurosa y empírica que la solución implementada es correcta, nos basamos en los resultados de la sonda de verificación (RaceConditionProbe) y el diseño arquitectónico de concurrencia:
 
 Invariantes: Mediante el uso de bloques synchronized con mínima granularidad, garantizamos las propiedades fundamentales del sistema: ningún paquete se procesa más de una vez, las posiciones de entrega forman una secuencia perfecta de 1..N, y los registros de estadísticas son exactos.
 
@@ -557,10 +557,10 @@ El rediseño del sistema utilizando primitivas de sincronización de Java sobre 
 
 | Atributo | Impacto de la solución | Evidencia / métrica |
 |---|---|---|
-| Correctitud / Reliability | | |
-| Performance / Throughput | | |
-| Maintainability | | |
-| Scalability | | |
+| Correctitud / Reliability |Aumenta significativamente: se eliminan las tres condiciones de carrera documentadas en la sección 3 |RaceConditionProbe pasa de anomalías visibles (Run 06: processedCounter=392≠registry=498, uniquePositions=376≠498) a 0/100 en la solución final |
+| Performance / Throughput |Existe un ligero overhead inherente al uso de bloqueos (adquirir y liberar el monitor). Sin embargo, el throughput general se preservó al usar granularidad mínima (bloqueando solo las líneas estrictas de mutación). Además, se mejoró el rendimiento general del procesador al eliminar la "espera activa" |Reducción del 100% de los ciclos de CPU desperdiciados durante el estado de pausa, al reemplazar Thread.onSpinWait() por el bloqueo pasivo de wait(). Los robots no forman "cuellos de botella" masivos gracias a que las regiones críticas son muy cortas |
+| Maintainability |El código es más limpio y fácil de razonar matemáticamente. Al centralizar la lógica de concurrencia de las pausas en el monitor SimulationControl |Uso de estándares idiomáticos de Java (synchronized, wait(), notifyAll(), join()). Código legible donde el límite de la "región crítica" es evidente |
+| Scalability |La solución escala muy bien de forma vertical (añadiendo más procesadores o núcleos a la misma máquina para soportar más hilos) |La evidencia recae en la naturaleza de la JVM: los candados de synchronized solo existen en la memoria local de una única máquina. Si se añade un balanceador de carga con múltiples servidores, la solución perdería su efecto protector y requeriría refactorizarse hacia bloqueos distribuidos |
 
 ---
 
@@ -570,10 +570,7 @@ El rediseño del sistema utilizando primitivas de sincronización de Java sobre 
 
 **Respuesta:**
 
-`________________________________________________________________________`
-
-`________________________________________________________________________`
-
+`Se ganó corrección verificable: el sistema ahora sostiene los invariantes bajo cualquier interleaving posible del scheduler, no solo "la mayoría de las veces" como el starter. A cambio, se sacrificó parte del throughput del starter original, porque ahora los robots pueden quedar bloqueados esperando un lock cuando compiten por el mismo recurso (por ejemplo, varios de los 12+ robots intentando tomar un parcel de PackageQueue al mismo tiempo). Este costo es aceptable porque el starter "rápido" era en realidad incorrecto —su velocidad venía precisamente de no garantizar nada—, y el trade-off se minimizó manteniendo la granularidad de los locks lo más pequeña posible (un lock por objeto, no un lock global compartido entre las tres clases), preservando la mayor parte del paralelismo real entre operaciones sobre recursos distintos`
 ---
 
 # 14. Análisis arquitectónico
