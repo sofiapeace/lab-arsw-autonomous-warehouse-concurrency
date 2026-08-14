@@ -19,16 +19,11 @@ public class PackageQueue {
         pending.addAll(parcels);
     }
 
-    public Parcel takeNext() {
-        // Deliberate check-then-act race condition.
+    public synchronized Parcel takeNext() {
         if (pending.isEmpty()) {
             return null;
         }
-
         Parcel selected = pending.get(0);
-        Thread.yield();
-
-        // Another thread may have changed the list between get(0) and remove(0).
         pending.remove(0);
         return selected;
     }

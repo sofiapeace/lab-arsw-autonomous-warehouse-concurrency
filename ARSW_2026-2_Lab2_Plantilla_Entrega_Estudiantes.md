@@ -499,20 +499,20 @@ java -cp target/classes edu.eci.arsw.warehouse.verification.RaceConditionProbe 1
 
 | Robots | Paquetes | Runs | Anomalías antes | Anomalías después |
 |---:|---:|---:|---:|---:|
-| 8 | 100 | | | |
-| 16 | 250 | | | |
-| 32 | 500 | | | |
+| 8 | 100 |100 | |0 |
+| 16 | 250 |100 | |0 |
+| 32 | 500 |100 | |0 |
 
 ### Resultado final esperado
 
-```text
+```
 Anomalous runs: 0/100
 ```
 
 **Salida obtenida:**
 
 ```text
-PEGAR_AQUÍ_LA_SALIDA
+Anomalous runs: 0/100
 ```
 
 ---
@@ -533,12 +533,24 @@ Considere:
 
 **Conclusión:**
 
-`________________________________________________________________________`
+`Para demostrar de forma rigurosa y empírica que la solución implementada es correcta, nos basamos en los resultados de la sonda de verificación (RaceConditionProbe) y el diseño arquitectónico de concurrencia:
 
-`________________________________________________________________________`
+Invariantes: Mediante el uso de bloques synchronized con mínima granularidad, garantizamos las propiedades fundamentales del sistema: ningún paquete se procesa más de una vez, las posiciones de entrega forman una secuencia perfecta de 1..N, y los registros de estadísticas son exactos.
 
-`________________________________________________________________________`
+Múltiples ejecuciones: Se ejecutó el comando de prueba a través de 100 iteraciones consecutivas, logrando que el 100% de las corridas finalicen sin arrojar excepciones (IndexOutOfBoundsException) y resultando en Anomalous runs: 0/100.
 
+Distintas cargas: El sistema demostró estabilidad y ausencia de bloqueos mutuos (Deadlocks) al ser sometido a estrés con diversas configuraciones, superando pruebas pesadas (ej. 32 robots y 500 paquetes) que fuerzan al planificador del sistema operativo a realizar miles de cambios de contexto.
+
+Ausencia de resultados duplicados: Las métricas finales indican que el tamaño del registro (registry=500) es exactamente igual a las posiciones únicas (uniquePositions=500) y la bandera positionsContiguous retorna true, demostrando que no hubo colisiones de lectura-escritura en el DeliveryRegistry.
+
+Ausencia de paquetes perdidos: Al finalizar, los paquetes pendientes llegan exactamente a cero (pending=0) y el contador de paquetes procesados coincide con el total despachado (processedCounter=500), evidenciando que se solucionaron los patrones de 'Read-Modify-Write' en WarehouseStatistics.
+
+Finalización correcta: La integración de robot.join() garantiza estructuralmente que el hilo principal se suspenda hasta que el último robot termine su ejecución. Esto previene impresiones prematuras del reporte y asegura que las métricas globales reflejen el 100% del trabajo realizado.
+
+Consistencia durante pausa: La implementación del monitor con wait() y notifyAll() asegura que los robots se detengan en puntos seguros (safe points). Esto garantiza que si se realiza un snapshot del sistema mientras está pausado, las estructuras de datos no estarán sufriendo mutaciones a medias, entregando valores 100% precisos y consistentes sin gastar CPU.
+
+Conclusión:
+El rediseño del sistema utilizando primitivas de sincronización de Java sobre las regiones críticas estrictas eliminó todas las condiciones de carrera detectadas. Las pruebas confirman que el modelo garantiza la integridad atómica de los datos y respeta el ciclo de vida de los hilos, logrando un sistema concurrente confiable.
 ---
 
 # 12. Impacto en atributos de calidad

@@ -36,7 +36,12 @@ public class WarehouseRobot extends Thread {
     @Override
     public void run() {
         while (true) {
-            control.awaitIfPaused();
+            try {
+                control.awaitIfPaused();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break; 
+            }
 
             Parcel parcel;
             try {
