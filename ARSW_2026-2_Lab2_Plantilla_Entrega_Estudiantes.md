@@ -680,10 +680,12 @@ Resuma los principales cambios de código.
 
 | Archivo / Clase | Cambio realizado | Razón |
 |---|---|---|
-| | | |
-| | | |
-| | | |
-| | | |
+| `PackageQueue` | Se marcó `takeNext()` como `synchronized` y se quitó el `Thread.yield()` que tenía en la mitad | Revisar si la lista está vacía, mirar el primer paquete y sacarlo tienen que pasar como una sola operación. Si quedan separados, dos robots se llevan el mismo paquete y la lista se daña por dentro |
+| `DeliveryRegistry` | Se marcó `register()` como `synchronized` y se quitó el `Thread.yield()` | Asignar la posición de llegada y guardar el registro deben ir juntos. Si no, dos robots reciben la misma posición y además se pierden registros porque varios escriben sobre la lista al tiempo |
+| `WarehouseStatistics` | Se marcó `recordProcessed()` como `synchronized` y las sumas quedaron directas: `processedParcels++` y `totalProcessingMillis += elapsedMillis` | Sumar 1 no es una sola operación. Si dos robots leen el mismo valor antes de que alguno escriba, se pierde un incremento y el contador queda por debajo del trabajo que sí se hizo |
+| `SimulationControl` | Se reemplazó la espera activa por un monitor. `pause()`, `resume()`, `awaitIfPaused()` e `isPaused()` quedaron `synchronized`, usando `wait()` y `notifyAll()`. El campo `paused` ya no necesita ser `volatile` porque todo el acceso pasa por métodos sincronizados | Con `Thread.onSpinWait()` cada robot pausado ocupaba un núcleo al 100% sin hacer nada útil. Con `wait()` el hilo queda suspendido de verdad y no gasta CPU hasta que `resume()` lo despierta. Se usó `notifyAll()` y no `notify()` porque este último despertaría a un solo robot y dejaría a los demás bloqueados |
+| `WarehouseRobot` | Se agregó el manejo de `InterruptedException` alrededor de la llamada a `awaitIfPaused()` | Ese método ahora puede lanzar esa excepción porque usa `wait()`. Al capturarla se restaura la marca de interrupción del hilo y el robot sale del ciclo de forma ordenada en vez de morir de golpe |
+| `WarehouseMain` | Se quitó el `Thread.sleep(60)` junto con el reporte prematuro, y se llama `simulation.awaitCompletion()` antes de imprimir un único reporte final | `Thread.sleep(60)` era una adivinanza: el hilo principal suponía que en 60 ms los robots ya habrían terminado, y por eso el reporte salía con 66 paquetes todavía pendientes. `awaitCompletion()` hace `join()` sobre cada robot, o sea que espera un hecho real (que el hilo termine) y no un tiempo estimado. Así el reporte se imprime una sola vez y con el estado final |
 
 ---
 
