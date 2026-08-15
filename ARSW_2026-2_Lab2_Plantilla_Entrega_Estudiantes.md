@@ -641,36 +641,36 @@ Suponga ahora que existen tres instancias de la aplicación:
 
 ### Context
 
-`________________________________________________________________________`
+`La simulación del almacén corre cada robot como un hilo de Java y todos comparten los mismos cuatro objetos: PackageQueue, DeliveryRegistry, WarehouseStatistics y SimulationControl. El código inicial no tenía ninguna sincronización, entonces aparecían paquetes entregados dos veces, registros que se perdían, posiciones de llegada repetidas y contadores por debajo del trabajo real. En una corrida el programa ni siquiera terminó y se quedó girando.`
 
-`________________________________________________________________________`
+`Había que corregir esto con dos restricciones del enunciado: no quitar la concurrencia y no resolverlo poniendo un solo candado global que volviera todo secuencial.`
 
 ### Decision
 
-`________________________________________________________________________`
+`Usar las primitivas de monitor de Java (synchronized) sobre las regiones críticas mínimas, con un candado por objeto y no uno compartido entre las tres clases. En PackageQueue se protege takeNext() completo, porque revisar si la lista está vacía, mirar el primer paquete y sacarlo tienen que pasar como una sola operación. En DeliveryRegistry se protege register(), porque asignar la posición y guardar el registro también van juntos. En WarehouseStatistics se protege recordProcessed(), que es donde se suma 1 a los dos contadores.`
 
-`________________________________________________________________________`
+`Para la pausa se convirtió SimulationControl en un monitor con wait() y notifyAll(), en lugar del ciclo de espera activa que traía el código inicial. La terminación de los hilos se coordina con join() desde awaitCompletion(). El trabajo pesado, o sea el Thread.sleep que simula el transporte del paquete, queda por fuera de los bloques sincronizados para no bloquear a los demás robots mientras uno "camina".`
 
 ### Alternatives considered
 
-1. `____________________________________________________________________`
-2. `____________________________________________________________________`
+1. `Un candado global, ya sea un objeto único compartido o marcando todos los métodos públicos como synchronized. Es la opción más fácil y garantiza que no haya condiciones de carrera, pero vuelve la ejecución prácticamente secuencial: los robots harían fila para cualquier operación y se perdería el beneficio de la concurrencia. El enunciado además lo prohíbe explícitamente.`
+2. `Reemplazar los contadores por AtomicInteger y AtomicLong. Funciona bien para WarehouseStatistics porque son variables sueltas, pero no sirve para PackageQueue ni para DeliveryRegistry, donde hay que mover varias cosas juntas (la lista más el contador de posición) como una sola unidad. Los tipos Atomic solo garantizan atomicidad de una variable a la vez.`
 
 ### Quality attributes affected
 
-`________________________________________________________________________`
+`Correctitud: mejora mucho, es el objetivo del cambio. Rendimiento: baja un poco porque los robots pueden quedar esperando un candado, aunque se mitigó dejando las regiones críticas lo más cortas posible. Mantenibilidad: mejora, porque toda la lógica de concurrencia quedó concentrada en las tres clases de core y no repartida por el código. Escalabilidad: solo sirve dentro de una misma JVM, como se explica en la sección 14.`
 
 ### Evidence
 
-`________________________________________________________________________`
+`RaceConditionProbe con 100 corridas, 32 robots y 500 paquetes da Anomalous runs: 0/100, con registry=500, uniqueParcels=500, uniquePositions=500 y positionsContiguous=true. Antes de los cambios las mismas configuraciones daban 50/50, 30/30 y 20/20 corridas anómalas, y en el caso de 8 robots la sonda se colgó en la corrida 21. mvn clean test pasa sin errores y PauseResumeDemo entrega sumas exactas (66 pendientes + 114 registrados = 180 paquetes).`
 
 ### Consequences
 
-`________________________________________________________________________`
+`Los robots ahora pueden quedar esperando cuando dos quieren el mismo objeto al tiempo, así que hay algo menos de paralelismo que en el código inicial. Como se usó un candado por objeto y no uno global, dos robots sí pueden trabajar al mismo tiempo si están tocando cosas distintas, por ejemplo uno registrando una entrega mientras otro toma un paquete de la cola. El estado compartido queda consistente únicamente dentro de una JVM.`
 
 ### Risks
 
-`________________________________________________________________________`
+`Si alguien agrega después un método nuevo que toque el estado compartido y se le olvida sincronizarlo, el problema vuelve sin que nada avise, porque estos errores no lanzan excepciones sino que dejan números mal. Si alguien mete trabajo pesado dentro de un bloque synchronized se pierde el paralelismo que se quiso conservar. Y si el sistema se despliega en varias instancias, synchronized deja de proteger la invariante y toca cambiar de enfoque, como se analizó en la sección 14.`
 
 ---
 
