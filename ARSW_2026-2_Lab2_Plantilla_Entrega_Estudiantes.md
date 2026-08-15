@@ -706,11 +706,11 @@ Resuma los principales cambios de código.
 
 Incluya entre **3 y 5 conclusiones concretas**.
 
-1. `______________________________________________________________________`
-2. `______________________________________________________________________`
-3. `______________________________________________________________________`
-4. `______________________________________________________________________`
-5. `______________________________________________________________________`
+1. `Un programa concurrente puede parecer correcto y estar mal. El código inicial terminaba sin errores y mostraba números creíbles, pero al correr la sonda 50 veces seguidas resultó que el 100% de las corridas estaba mal. Una sola ejecución buena no prueba nada. Para saber si un sistema concurrente funciona hay que correrlo muchas veces y verificar invariantes, no mirar si "salió bien esta vez".`
+2. `Arreglar una condición de carrera no es agregar candados sino darse cuenta de cuáles operaciones tienen que pasar como una sola. El problema de takeNext() no era que le faltara synchronized en general, era que revisar si la lista está vacía, mirar el primer paquete y sacarlo estaban separados. Por eso el candado va justo sobre esas tres líneas y no sobre toda la clase, y por eso el Thread.sleep que simula el transporte quedó por fuera.`
+3. `Esperar por tiempo no es sincronizar. Thread.sleep(60) suponía que en 60 milisegundos los robots ya habrían terminado, y esa suposición se rompe apenas cambia la carga o la máquina. join() no supone nada porque espera un hecho real, que es que el hilo termine. La diferencia se vio directo en el reporte: 66 paquetes todavía pendientes contra 0.`
+4. `Una condición de carrera no solo daña datos, también puede tumbar el programa. Con 8 robots y 100 paquetes el ArrayList quedó con su contador interno de tamaño en negativo, entonces la lista decía que no estaba vacía pero no entregaba nada. Los robots quedaron girando para siempre, el proceso ocupó un núcleo al 100% y escribió 22 millones de líneas de error en tres minutos. Un dato corrupto se puede corregir, un programa que nunca termina toca matarlo a mano.`
+5. `El synchronized solo protege dentro de una misma JVM. Si mañana el almacén se despliega en tres instancias detrás de un balanceador, todo este trabajo de sincronización deja de servir y hay que mover el estado compartido a la base de datos. O sea que la solución correcta no depende solo del lenguaje sino de dónde vive el estado que se está protegiendo.`
 
 ---
 
