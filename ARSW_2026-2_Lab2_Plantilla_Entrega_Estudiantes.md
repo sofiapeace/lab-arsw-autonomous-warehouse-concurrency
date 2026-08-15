@@ -368,11 +368,11 @@ Esto ocurre porque transformaríamos un entorno altamente concurrente en una eje
 Marque y explique cuáles evaluaron:
 
 - [X] `synchronized`
-- [ ] `AtomicInteger`
+- [X] `AtomicInteger`
 - [ ] Colecciones concurrentes
 - [ ] `Lock`
-- [ ] `wait()` / `notifyAll()`
-- [X] Otra: `Uso de variables atómicas`
+- [X] `wait()` / `notifyAll()`
+- [ ] Otra: `________________________`
 
 ### Alternativa 1
 
@@ -417,7 +417,7 @@ Explique cómo garantizaron que el programa solamente genera el reporte final cu
 `Thread.join(), invocado sobre cada WarehouseRobot desde WarehouseSimulation.awaitCompletion(), llamado explícitamente antes de imprimir el reporte final`
 
 **Explicación:**  
-`Como se evidenció en la sección 1.2, el starter imprime el reporte con 68 de 100 paquetes aún pendientes porque WarehouseMain.main() no espera a que terminen los robots antes de reportar. La corrección consiste en invocar simulation.awaitCompletion() —que recorre la lista de robots y llama robot.join() sobre cada uno— antes de tomar el snapshot() y de imprimir el reporte. join() bloquea al hilo llamador hasta que el robot correspondiente termine completamente su run(), garantizando que las 12 (o N) tareas hayan finalizado antes de leer cualquier estado compartido, y que el reporte se imprima exactamente una vez, ya en el estado final consistente del sistema`
+`Como se evidenció en la sección 1.2, el starter imprime el reporte con 66 de 100 paquetes aún pendientes porque WarehouseMain.main() no espera a que terminen los robots antes de reportar. La corrección consiste en invocar simulation.awaitCompletion() —que recorre la lista de robots y llama robot.join() sobre cada uno— antes de tomar el snapshot() y de imprimir el reporte. join() bloquea al hilo llamador hasta que el robot correspondiente termine completamente su run(), garantizando que las 12 (o N) tareas hayan finalizado antes de leer cualquier estado compartido, y que el reporte se imprima exactamente una vez, ya en el estado final consistente del sistema`
 
 
 ### Pregunta
@@ -425,7 +425,7 @@ Explique cómo garantizaron que el programa solamente genera el reporte final cu
 ¿Por qué usar `Thread.sleep(...)` no sería una solución correcta para esperar la finalización de todos los workers?
 
 **Respuesta:**  
-`Porque sleep(n) pausa el hilo actual un tiempo fijo, sin ninguna relación con el estado real de otros hilos — asume que se puede predecir cuánto tardará el trabajo concurrente, lo cual es falso en general (depende del número de parcels, del jitter aleatorio en el procesamiento, del número de robots activos y del scheduling del sistema operativo). Si el tiempo estimado es corto, el reporte se imprime antes de que termine el trabajo —exactamente el bug observado en la sección 1.2, donde a los 100 parcels solo 19 se habían procesado—; si es demasiado largo, se desperdicia tiempo esperando innecesariamente. join(), en cambio, sincroniza sobre un evento real —la terminación efectiva del hilo— y es correcto sin importar cuánto tarde el trabajo en la práctica`
+`Porque sleep(n) pausa el hilo actual un tiempo fijo, sin ninguna relación con el estado real de otros hilos — asume que se puede predecir cuánto tardará el trabajo concurrente, lo cual es falso en general (depende del número de parcels, del jitter aleatorio en el procesamiento, del número de robots activos y del scheduling del sistema operativo). Si el tiempo estimado es corto, el reporte se imprime antes de que termine el trabajo —exactamente el bug observado en la sección 1.2, donde de los 100 paquetes solo 22 se habían procesado—; si es demasiado largo, se desperdicia tiempo esperando innecesariamente. join(), en cambio, sincroniza sobre un evento real —la terminación efectiva del hilo— y es correcto sin importar cuánto tarde el trabajo en la práctica`
 
 ---
 
@@ -462,28 +462,31 @@ resume() cambia paused = false y llama notifyAll(), que despierta a todos los hi
 
 Cuando la simulación está pausada, registre:
 
-```java -cp target/classes edu.eci.arsw.warehouse.app.PauseResumeDemo
+```text
+$ java -cp target/classes edu.eci.arsw.warehouse.app.PauseResumeDemo
 
 --- PAUSED SNAPSHOT ---
 Initial parcels : 180
 Pending parcels : 66
-Processed count : 106
-Registry size   : 118
-Current leader  : Robot-08 / parcel 8 / position 1
+Processed count : 114
+Registry size   : 114
+Current leader  : Robot-02 / parcel 2 / position 1
 Simulation paused = true
 
 --- FINAL SNAPSHOT ---
 Initial parcels : 180
-Pending parcels : 2
-Processed count : 155
-Registry size   : 171
-Current leader  : Robot-08 / parcel 8 / position 1
+Pending parcels : 0
+Processed count : 180
+Registry size   : 180
+Current leader  : Robot-02 / parcel 2 / position 1
 ```
 
 Explique cómo garantizan que esos valores representan un estado consistente.
 
 **Respuesta:**  
-`Estos valores representan un estado consistente porque el mecanismo de pausa actúa como una barrera de sincronización segura (safe point). Al utilizar 'wait()', nos aseguramos de que todos los hilos trabajadores (robots) suspendan su ejecución en el mismo punto de control de su ciclo principal (antes o después de procesar un paquete completo). Dado que ningún robot está en estado de 'RUNNABLE' interactuando con PackageQueue, DeliveryRegistry o WarehouseStatistics durante la pausa, el estado global de la memoria queda completamente "congelado". Al no haber mutaciones concurrentes en progreso, el snapshot refleja una foto exacta y matemáticamente precisa del sistema en ese instante de tiempo, sin lecturas parciales`
+`Los valores son consistentes por dos razones. Primero, los robots no se detienen en cualquier punto: el llamado a awaitIfPaused() está al inicio del ciclo principal, es decir después de register() y de recordProcessed(). Un robot detenido ya terminó de escribir el paquete que llevaba y nunca queda a mitad de una escritura, y por eso Processed count y Registry size siempre coinciden (114 y 114). Segundo, wait() suspende realmente al hilo en lugar de dejarlo consultando la bandera, así que mientras dura la pausa ningún robot detenido toca PackageQueue, DeliveryRegistry ni WarehouseStatistics.`
+
+`Hay un límite que conviene declarar: pause() es una solicitud, no una detención inmediata. Un robot que ya tomó un paquete lo termina antes de llegar al punto seguro, de modo que la pausa se propaga en el tiempo que dura un paquete (~25 ms). Por eso el snapshot no se toma en el instante mismo de pausar sino tras un margen de espera. La verificación de que ese margen fue suficiente es empírica: pendientes + registro = 66 + 114 = 180, exactamente el total de paquetes, lo que demuestra que ningún robot quedó con un paquete en la mano al momento de la foto. Garantizarlo por construcción, y no por margen, exigiría que la pausa contara cuántos robots ya llegaron al punto seguro antes de permitir la lectura.`
 
 ---
 
@@ -499,9 +502,17 @@ java -cp target/classes edu.eci.arsw.warehouse.verification.RaceConditionProbe 1
 
 | Robots | Paquetes | Runs | Anomalías antes | Anomalías después |
 |---:|---:|---:|---:|---:|
-| 8 | 100 |100 | |0 |
-| 16 | 250 |100 | |0 |
-| 32 | 500 |100 | |0 |
+| 8 | 100 | 100 | 20/20 | 0/100 |
+| 16 | 250 | 100 | 30/30 | 0/100 |
+| 32 | 500 | 100 | 50/50 | 0/100 |
+
+**Nota sobre los denominadores.** Las mediciones "antes" se tomaron con menos
+corridas que las "después" porque el starter no siempre lograba completar la serie:
+con 8 robots y 100 paquetes la sonda se colgó en la corrida 21 y hubo que abortarla
+manualmente, y con la configuración por defecto abortó en la corrida 11 con
+`NullPointerException`. Aun así el resultado es concluyente: **el 100% de las
+corridas del starter fue anómalo en las tres configuraciones**, mientras que la
+solución final completa las 100 corridas sin una sola anomalía.
 
 ### Resultado final esperado
 
