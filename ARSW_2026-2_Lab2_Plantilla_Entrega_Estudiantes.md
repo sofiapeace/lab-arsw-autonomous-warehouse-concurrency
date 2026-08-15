@@ -603,13 +603,13 @@ Suponga ahora que existen tres instancias de la aplicación:
 ¿Los bloques `synchronized` utilizados dentro de una JVM garantizan consistencia entre `App A`, `App B` y `App C`?
 
 - [ ] Sí
-- [ ] No
+- [X] No
 
 **Justificación:**
 
-`________________________________________________________________________`
+`No. El synchronized solo funciona dentro de una misma JVM. El candado existe en la memoria de ese programa y en ningún otro lado. Si App A bloquea su DeliveryRegistry, App B y App C ni se enteran, porque cada una tiene su propia copia de ese objeto en su propia memoria. Cada instancia tiene su propio candado y ninguno puede detener a los hilos de las otras dos.`
 
-`________________________________________________________________________`
+`Esto se ve rápido con nuestras invariantes. La I2 dice que las posiciones de llegada van de 1 hasta N sin repetirse. Pero cada instancia arranca su nextPosition en 1, entonces las tres le darían la posición 1 a paquetes diferentes. Es el mismo problema de la condición de carrera #3, solo que ahora pasa entre programas distintos y el synchronized no puede hacer nada. La I1 también se cae, porque nada evita que dos instancias tomen el mismo paquete. Lo importante es que arreglar la concurrencia dentro de una JVM no sirve automáticamente cuando hay varias corriendo al tiempo.`
 
 ---
 
@@ -617,19 +617,21 @@ Suponga ahora que existen tres instancias de la aplicación:
 
 ¿Qué alternativa consideraría para garantizar consistencia entre múltiples instancias?
 
-- [ ] Transacción en base de datos
-- [ ] Restricción / constraint en base de datos
+- [X] Transacción en base de datos
+- [X] Restricción / constraint en base de datos
 - [ ] Optimistic locking / versionado
 - [ ] Lock distribuido
 - [ ] Otra: `________________________`
 
 **Decisión propuesta:**
 
-`________________________________________________________________________`
+`Sacar el estado compartido de la memoria de los programas y guardarlo en la base de datos. La lista de paquetes y el registro de entregas pasan a ser tablas. Para tomar un paquete se usa una transacción, y para que no se repitan las posiciones de llegada se pone una restricción UNIQUE en esa columna.`
 
 **Justificación:**
 
-`________________________________________________________________________`
+`El problema de fondo no es cambiar un candado por otro. Es que el estado compartido ya no cabe en un solo programa. Mientras cada instancia tenga su propia copia en memoria no hay sincronización que sirva, porque no es un estado sino tres.`
+
+`Escogimos la base de datos porque ya es lo único que las tres instancias comparten, entonces no toca agregar nada nuevo. Para tomar un paquete se hace una consulta que busca una fila pendiente y la marca como tomada dentro de la misma transacción. Así la base de datos se encarga de que dos instancias no puedan llevarse la misma fila, que es justo lo que hacía el synchronized en takeNext(). En SQL esto se logra con SELECT FOR UPDATE SKIP LOCKED. Para la posición de llegada se usa una secuencia de la base de datos y se agrega la restricción UNIQUE. Esa restricción sirve mucho porque la base de datos la hace cumplir siempre, incluso si el código llega a tener un error. Un candado en cambio solo funciona si el programador se acuerda de pedirlo.`
 
 ---
 
