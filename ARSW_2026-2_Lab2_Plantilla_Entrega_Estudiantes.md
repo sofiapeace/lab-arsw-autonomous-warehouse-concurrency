@@ -716,18 +716,34 @@ Incluya entre **3 y 5 conclusiones concretas**.
 
 # 19. Checklist de entrega
 
-- [ ] El proyecto compila con `mvn clean test`.
-- [ ] El código utiliza Java 21.
-- [ ] No se eliminó la concurrencia.
-- [ ] No existe busy waiting en la solución final.
-- [ ] El programa espera correctamente la finalización de todos los robots.
-- [ ] Las regiones críticas están justificadas.
-- [ ] Se preservan las invariantes definidas.
-- [ ] El `RaceConditionProbe` final no presenta anomalías.
-- [ ] Se documentó el análisis arquitectónico.
-- [ ] Se incluyó el ADR.
-- [ ] El repositorio contiene commits claros.
+- [X] El proyecto compila con `mvn clean test`.
+- [X] El código utiliza Java 21.
+- [X] No se eliminó la concurrencia.
+- [X] No existe busy waiting en la solución final.
+- [X] El programa espera correctamente la finalización de todos los robots.
+- [X] Las regiones críticas están justificadas.
+- [X] Se preservan las invariantes definidas.
+- [X] El `RaceConditionProbe` final no presenta anomalías.
+- [X] Se documentó el análisis arquitectónico.
+- [X] Se incluyó el ADR.
+- [X] El repositorio contiene commits claros.
 - [ ] Se incluyó la URL del repositorio y el commit final.
+
+**Sustento de cada punto:**
+
+| Punto | Dónde se verifica |
+|---|---|
+| Compila con `mvn clean test` | Sección 17. BUILD SUCCESS con 2 pruebas y 0 fallas |
+| Java 21 | `pom.xml` define `<maven.compiler.release>21</maven.compiler.release>`, y la nota de la sección 1.1 explica la diferencia con el JDK sobre el que corre Maven |
+| No se eliminó la concurrencia | Los robots siguen siendo hilos de plataforma (`WarehouseRobot extends Thread`). No se usaron pools ni hilos virtuales, como pide el enunciado |
+| Sin busy waiting | `SimulationControl` usa `wait()` y `notifyAll()`. No queda ningún `Thread.onSpinWait()` en el código |
+| Espera la finalización de los robots | `WarehouseMain` llama `awaitCompletion()`, que hace `join()` sobre cada robot antes del reporte final. Secciones 8 y 16 |
+| Regiones críticas justificadas | Sección 6, con la invariante que protege cada una y por qué ese tamaño |
+| Invariantes preservadas | Sección 5 las define y la sonda las verifica en la sección 10 |
+| Sonda sin anomalías | `0/100` en las tres configuraciones: 8/100, 16/250 y 32/500. Secciones 10 y 17 |
+| Análisis arquitectónico | Sección 14 |
+| ADR | Sección 15 |
+| Commits claros | Historial del repositorio, con un commit por sección y el motivo del cambio en el cuerpo |
 
 ---
 
