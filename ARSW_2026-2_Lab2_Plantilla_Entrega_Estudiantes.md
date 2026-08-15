@@ -20,7 +20,7 @@
 https://github.com/sofiapeace/lab-arsw-autonomous-warehouse-concurrency
 
 **Commit final:**  
-`PEGAR_AQUÍ_HASH_DEL_COMMIT`
+`4dd8fa9` — commit donde queda cerrado el contenido del informe.
 
 ---
 
@@ -558,7 +558,7 @@ Ausencia de paquetes perdidos: Al finalizar, los paquetes pendientes llegan exac
 
 Finalización correcta: La integración de robot.join() garantiza estructuralmente que el hilo principal se suspenda hasta que el último robot termine su ejecución. Esto previene impresiones prematuras del reporte y asegura que las métricas globales reflejen el 100% del trabajo realizado.
 
-Consistencia durante pausa: La implementación del monitor con wait() y notifyAll() asegura que los robots se detengan en puntos seguros (safe points). Esto garantiza que si se realiza un snapshot del sistema mientras está pausado, las estructuras de datos no estarán sufriendo mutaciones a medias, entregando valores 100% precisos y consistentes sin gastar CPU.
+Consistencia durante pausa: el monitor con wait() y notifyAll() hace que los robots se detengan en puntos seguros, o sea después de haber terminado de registrar el paquete que llevaban. Por eso un robot detenido nunca deja una escritura a medias y el contador de procesados coincide con el tamaño del registro. Como se explica en la sección 9.3, la pausa no es instantánea, porque un robot que ya tomó un paquete lo termina antes de detenerse, así que el snapshot se toma tras un margen de espera y su consistencia se comprueba verificando que los pendientes más los registrados sumen el total de paquetes.
 
 Conclusión:
 El rediseño del sistema utilizando primitivas de sincronización de Java sobre las regiones críticas estrictas eliminó todas las condiciones de carrera detectadas. Las pruebas confirman que el modelo garantiza la integridad atómica de los datos y respeta el ciclo de vida de los hilos, logrando un sistema concurrente confiable.
@@ -568,7 +568,7 @@ El rediseño del sistema utilizando primitivas de sincronización de Java sobre 
 
 | Atributo | Impacto de la solución | Evidencia / métrica |
 |---|---|---|
-| Correctitud / Reliability |Aumenta significativamente: se eliminan las tres condiciones de carrera documentadas en la sección 3 |RaceConditionProbe pasa de anomalías visibles (Run 06: processedCounter=392≠registry=498, uniquePositions=376≠498) a 0/100 en la solución final |
+| Correctitud / Reliability |Aumenta significativamente: se eliminan las tres condiciones de carrera documentadas en la sección 3 |RaceConditionProbe pasa de anomalías visibles (Run 02 de la sección 3: processedCounter=474≠registry=508, uniquePositions=444≠508) a 0/100 en la solución final |
 | Performance / Throughput |Existe un ligero overhead inherente al uso de bloqueos (adquirir y liberar el monitor). Sin embargo, el throughput general se preservó al usar granularidad mínima (bloqueando solo las líneas estrictas de mutación). Además, se mejoró el rendimiento general del procesador al eliminar la "espera activa" |Reducción del 100% de los ciclos de CPU desperdiciados durante el estado de pausa, al reemplazar Thread.onSpinWait() por el bloqueo pasivo de wait(). Los robots no forman "cuellos de botella" masivos gracias a que las regiones críticas son muy cortas |
 | Maintainability |El código es más limpio y fácil de razonar matemáticamente. Al centralizar la lógica de concurrencia de las pausas en el monitor SimulationControl |Uso de estándares idiomáticos de Java (synchronized, wait(), notifyAll(), join()). Código legible donde el límite de la "región crítica" es evidente |
 | Scalability |La solución escala muy bien de forma vertical (añadiendo más procesadores o núcleos a la misma máquina para soportar más hilos) |La evidencia recae en la naturaleza de la JVM: los candados de synchronized solo existen en la memoria local de una única máquina. Si se añade un balanceador de carga con múltiples servidores, la solución perdería su efecto protector y requeriría refactorizarse hacia bloqueos distribuidos |
@@ -727,7 +727,7 @@ Incluya entre **3 y 5 conclusiones concretas**.
 - [X] Se documentó el análisis arquitectónico.
 - [X] Se incluyó el ADR.
 - [X] El repositorio contiene commits claros.
-- [ ] Se incluyó la URL del repositorio y el commit final.
+- [X] Se incluyó la URL del repositorio y el commit final.
 
 **Sustento de cada punto:**
 
