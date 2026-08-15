@@ -693,11 +693,12 @@ Resuma los principales cambios de código.
 
 | Prueba | Comando | Resultado |
 |---|---|---|
-| Compilación y tests | `mvn clean test` | |
-| Simulación estándar | | |
-| RaceConditionProbe | | |
-| Pause / Resume | | |
-| Otra | | |
+| Compilación y tests | `mvn clean test` | BUILD SUCCESS. Tests run: 2, Failures: 0, Errors: 0, Skipped: 0 |
+| Simulación estándar | `java -cp target/classes edu.eci.arsw.warehouse.app.WarehouseMain` | Un solo reporte final, ya no sale el prematuro. Pending 0, Processed 100, Registry 100 sobre 100 paquetes |
+| Simulación con más carga | `java -cp target/classes edu.eci.arsw.warehouse.app.WarehouseMain 24 250` | Pending 0, Processed 250, Registry 250 sobre 250 paquetes |
+| RaceConditionProbe (configuración exigida) | `java -cp target/classes edu.eci.arsw.warehouse.verification.RaceConditionProbe 100 32 500` | `Anomalous runs: 0/100`, con registry=500, uniqueParcels=500, uniquePositions=500 y positionsContiguous=true |
+| RaceConditionProbe (otras cargas) | `... RaceConditionProbe 100 8 100` y `... RaceConditionProbe 100 16 250` | `Anomalous runs: 0/100` en las dos. Con esto quedan verificadas a 100 corridas las tres configuraciones de la tabla de la sección 10 |
+| Pause / Resume | `java -cp target/classes edu.eci.arsw.warehouse.app.PauseResumeDemo` | Snapshot pausado con 66 pendientes y 114 registrados, que suman los 180 paquetes. Processed y Registry coinciden. Snapshot final en 0 pendientes y 180 registrados |
 
 ---
 
